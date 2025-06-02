@@ -1851,6 +1851,10 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 	rawLabels := map[string]struct{}{}
 	for _, container := range containers {
 		for l := range c.containerLabelsFunc(container) {
+			if l == "container_label_restartcount" {
+				// no more need to export this label
+				continue
+			}
 			rawLabels[l] = struct{}{}
 		}
 	}
@@ -1858,7 +1862,23 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 	for _, cont := range containers {
 		values := make([]string, 0, len(rawLabels))
 		labels := make([]string, 0, len(rawLabels))
+
 		containerLabels := c.containerLabelsFunc(cont)
+		var restartcnt int
+		rcnt := containerLabels["container_label_restartcount"]
+		if rcnt == "" {
+			restartcnt = 0
+		} else {
+			restartcnt, err = strconv.Atoi(rcnt)
+			if err != nil {
+				klog.Warningf("Couldn't parse restart count for container %s: %s", cont.Id, err)
+				continue
+			}
+		}
+
+		// prevent metric to discrete
+		delete(containerLabels, "container_label_restartcount")
+
 		for l := range rawLabels {
 			duplicate := false
 			sl := sanitizeLabelName(l)
@@ -1871,18 +1891,6 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 			if !duplicate {
 				labels = append(labels, sl)
 				values = append(values, containerLabels[l])
-			}
-		}
-
-		var restartcnt int
-		rcnt := containerLabels["container_label_restartcount"]
-		if rcnt == "" {
-			restartcnt = 0
-		} else {
-			restartcnt, err = strconv.Atoi(rcnt)
-			if err != nil {
-				klog.Warningf("Couldn't parse restart count for container %s: %s", cont.Id, err)
-				continue
 			}
 		}
 
