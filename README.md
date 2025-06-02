@@ -7,7 +7,7 @@ cAdvisor (Container Advisor) provides container users an understanding of the re
 1. **Make docker image**
 
 ```bash
-make docker-%
+make docker-image
 ```
 
 2. **Make `docker-compose.yml` file**
